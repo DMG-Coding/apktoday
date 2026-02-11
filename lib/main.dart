@@ -21,7 +21,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// SPLASH SCREEN
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
   @override
@@ -70,7 +70,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-// LOGIN PAGE
+
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
   @override
@@ -201,7 +201,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-// SIGNUP PAGE
+
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
   @override
@@ -317,7 +317,7 @@ class _SignupPageState extends State<SignupPage> {
   }
 }
 
-// HOME PAGE
+
 class HomePage extends StatelessWidget {
   final String email;
   const HomePage({super.key, required this.email});
