@@ -21,7 +21,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
   @override
@@ -33,10 +32,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     Timer(const Duration(seconds: 3), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginPage()));
     });
   }
 
@@ -51,13 +47,8 @@ class _SplashScreenState extends State<SplashScreen> {
             Container(
               width: 120,
               height: 120,
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Center(
-                child: Text('L', style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: Colors.white)),
-              ),
+              decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20)),
+              child: const Center(child: Text('L', style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: Colors.white))),
             ),
             const SizedBox(height: 24),
             const Text('APK TODAY', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black87)),
@@ -70,89 +61,53 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
-  @override
-  State<LoginPage> createState() => _LoginPageState();
+// Base class for Login and Signup pages to share common code
+abstract class AuthPage extends StatefulWidget {
+  const AuthPage({super.key});
 }
 
-class _LoginPageState extends State<LoginPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-
-  Future<void> _login() async {
-    if (_formKey.currentState!.validate()) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final savedEmail = prefs.getString('user_email');
-        final savedPassword = prefs.getString('user_password');
-
-        if (savedEmail == null || savedPassword == null) {
-          _showSnackBar('❌ Pa gen kont! Tanpri enskri dabò.', Colors.orange);
-          return;
-        }
-
-        if (savedEmail.trim().toLowerCase() == _emailController.text.trim().toLowerCase() &&
-            savedPassword == _passwordController.text) {
-          _showSnackBar('✅ Koneksyon reyisi!', Colors.green);
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => HomePage(email: savedEmail)),
-          );
-        } else {
-          _showSnackBar('❌ Imèl oswa modpas pa kòrèk!', Colors.red);
-        }
-      } catch (e) {
-        _showSnackBar('❌ Erè: $e', Colors.red);
-      }
-    }
-  }
-
-  void _showSnackBar(String message, Color color) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: color, duration: const Duration(seconds: 1)),
-      );
-    }
-  }
-
+abstract class AuthPageState<T extends AuthPage> extends State<T> {
+  final formKey = GlobalKey<FormState>();
+  bool showKeyboard = false;
+  String activeField = '';
+  
+  List<FocusNode> getFocusNodes();
+  List<TextEditingController> getControllers();
+  
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFFF8E1),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('Log In', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.black87)),
-                  const SizedBox(height: 40),
-                  _buildTextField('Email', _emailController, TextInputType.emailAddress, false),
-                  const SizedBox(height: 24),
-                  _buildTextField('Password', _passwordController, TextInputType.text, true),
-                  const SizedBox(height: 32),
-                  _buildButton('Log In', _login),
-                  const SizedBox(height: 24),
-                  TextButton(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SignupPage())),
-                    child: const Text('Sign Up', style: TextStyle(fontSize: 16, color: Colors.black87, decoration: TextDecoration.underline)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  void initState() {
+    super.initState();
+    for (var i = 0; i < getFocusNodes().length; i++) {
+      final node = getFocusNodes()[i];
+      final fieldName = getFieldNames()[i];
+      node.addListener(() {
+        if (node.hasFocus) setState(() { showKeyboard = true; activeField = fieldName; });
+      });
+    }
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, TextInputType type, bool obscure) {
+  List<String> getFieldNames();
+
+  void onKeyTap(String key) {
+    final controller = getControllers()[getFieldNames().indexOf(activeField)];
+    final text = controller.text;
+    final selection = controller.selection;
+    
+    setState(() {
+      if (key == '⌫') {
+        if (selection.start > 0) {
+          controller.text = text.substring(0, selection.start - 1) + text.substring(selection.end);
+          controller.selection = TextSelection.collapsed(offset: selection.start - 1);
+        }
+      } else {
+        final newText = text.substring(0, selection.start) + key + text.substring(selection.end);
+        controller.text = newText;
+        controller.selection = TextSelection.collapsed(offset: selection.start + 1);
+      }
+    });
+  }
+
+  Widget buildTextField(String label, TextEditingController controller, FocusNode focus, bool obscure, {int? minLength, TextEditingController? matchController}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -160,7 +115,8 @@ class _LoginPageState extends State<LoginPage> {
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
-          keyboardType: type,
+          focusNode: focus,
+          keyboardType: TextInputType.none,
           obscureText: obscure,
           decoration: InputDecoration(
             filled: true,
@@ -171,6 +127,8 @@ class _LoginPageState extends State<LoginPage> {
           validator: (value) {
             if (value == null || value.isEmpty) return 'Tanpri antre $label';
             if (label == 'Email' && !value.contains('@')) return 'Imèl pa valid';
+            if (minLength != null && value.length < minLength) return 'Modpas la dwe gen omwen $minLength karaktè';
+            if (matchController != null && value != matchController.text) return 'Modpas yo pa menm bagay';
             return null;
           },
         ),
@@ -178,7 +136,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildButton(String text, VoidCallback onPressed) {
+  Widget buildButton(String text, VoidCallback onPressed) {
     return SizedBox(
       width: double.infinity,
       height: 50,
@@ -193,47 +151,194 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  Widget buildCustomKeyboard() {
+    final keys = [
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+      ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
+      ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', '@'],
+      ['z', 'x', 'c', 'v', 'b', 'n', 'm', '.', '_', '⌫'],
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: const BoxDecoration(
+        color: Color(0xFFD7CCC8),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        children: keys.map((row) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: row.map((key) => Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: GestureDetector(
+                  onTapDown: (_) => onKeyTap(key),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: key == '⌫' ? Colors.red.shade300 : Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(key, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: key == '⌫' ? Colors.white : Colors.black87)),
+                    ),
+                  ),
+                ),
+              ),
+            )).toList(),
+          ),
+        )).toList(),
+      ),
+    );
+  }
+
+  void showSnackBar(String message, Color color) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: color, duration: const Duration(seconds: 1)),
+      );
+    }
+  }
+
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    for (var controller in getControllers()) { controller.dispose(); }
+    for (var node in getFocusNodes()) { node.dispose(); }
     super.dispose();
   }
 }
 
+class LoginPage extends AuthPage {
+  const LoginPage({super.key});
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
 
-class SignupPage extends StatefulWidget {
+class _LoginPageState extends AuthPageState<LoginPage> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+
+  @override
+  List<FocusNode> getFocusNodes() => [_emailFocus, _passwordFocus];
+  
+  @override
+  List<TextEditingController> getControllers() => [_emailController, _passwordController];
+  
+  @override
+  List<String> getFieldNames() => ['email', 'password'];
+
+  Future<void> _login() async {
+    if (formKey.currentState!.validate()) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final savedEmail = prefs.getString('user_email');
+        final savedPassword = prefs.getString('user_password');
+
+        if (savedEmail == null || savedPassword == null) {
+          showSnackBar('❌ Pa gen kont! Tanpri enskri dabò.', Colors.orange);
+          return;
+        }
+
+        if (savedEmail.trim().toLowerCase() == _emailController.text.trim().toLowerCase() && savedPassword == _passwordController.text) {
+          showSnackBar('✅ Koneksyon reyisi!', Colors.green);
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage(email: savedEmail)));
+        } else {
+          showSnackBar('❌ Imèl oswa modpas pa kòrèk!', Colors.red);
+        }
+      } catch (e) {
+        showSnackBar('❌ Erè: $e', Colors.red);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8E1),
+      body: GestureDetector(
+        onTap: () {
+          for (var node in getFocusNodes()) { node.unfocus(); }
+          setState(() => showKeyboard = false);
+        },
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 40),
+                        const Text('Log In', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.black87)),
+                        const SizedBox(height: 40),
+                        buildTextField('Email', _emailController, _emailFocus, false),
+                        const SizedBox(height: 24),
+                        buildTextField('Password', _passwordController, _passwordFocus, true),
+                        const SizedBox(height: 32),
+                        buildButton('Log In', _login),
+                        const SizedBox(height: 24),
+                        TextButton(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SignupPage())),
+                          child: const Text('Sign Up', style: TextStyle(fontSize: 16, color: Colors.black87, decoration: TextDecoration.underline)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              if (showKeyboard) buildCustomKeyboard(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class SignupPage extends AuthPage {
   const SignupPage({super.key});
   @override
   State<SignupPage> createState() => _SignupPageState();
 }
 
-class _SignupPageState extends State<SignupPage> {
-  final _formKey = GlobalKey<FormState>();
+class _SignupPageState extends AuthPageState<SignupPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+  final _confirmFocus = FocusNode();
+
+  @override
+  List<FocusNode> getFocusNodes() => [_emailFocus, _passwordFocus, _confirmFocus];
+  
+  @override
+  List<TextEditingController> getControllers() => [_emailController, _passwordController, _confirmPasswordController];
+  
+  @override
+  List<String> getFieldNames() => ['email', 'password', 'confirm'];
 
   Future<void> _signup() async {
-    if (_formKey.currentState!.validate()) {
+    if (formKey.currentState!.validate()) {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_email', _emailController.text.trim());
         await prefs.setString('user_password', _passwordController.text);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Kont ou kreye avèk siksè!'), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
-          );
+          showSnackBar('✅ Kont ou kreye avèk siksè!', Colors.green);
           await Future.delayed(const Duration(seconds: 1));
           if (mounted) Navigator.pop(context);
         }
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('❌ Erè: $e'), backgroundColor: Colors.red),
-          );
-        }
+        if (mounted) showSnackBar('❌ Erè: $e', Colors.red);
       }
     }
   }
@@ -242,81 +347,45 @@ class _SignupPageState extends State<SignupPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFFF8E1),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('Sign Up', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.black87)),
-                  const SizedBox(height: 40),
-                  _buildTextField('Email', _emailController, false, null),
-                  const SizedBox(height: 24),
-                  _buildTextField('Password', _passwordController, true, 8),
-                  const SizedBox(height: 24),
-                  _buildTextField('Confirm Password', _confirmPasswordController, true, null),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _signup,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Sign Up', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+      body: GestureDetector(
+        onTap: () {
+          for (var node in getFocusNodes()) { node.unfocus(); }
+          setState(() => showKeyboard = false);
+        },
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 20),
+                        const Text('Sign Up', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.black87)),
+                        const SizedBox(height: 40),
+                        buildTextField('Email', _emailController, _emailFocus, false),
+                        const SizedBox(height: 24),
+                        buildTextField('Password', _passwordController, _passwordFocus, true, minLength: 8),
+                        const SizedBox(height: 24),
+                        buildTextField('Confirm Password', _confirmPasswordController, _confirmFocus, true, matchController: _passwordController),
+                        const SizedBox(height: 32),
+                        buildButton('Sign Up', _signup),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+              if (showKeyboard) buildCustomKeyboard(),
+            ],
           ),
         ),
       ),
     );
   }
-
-  Widget _buildTextField(String label, TextEditingController controller, bool obscure, int? minLength) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87)),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: label == 'Email' ? TextInputType.emailAddress : TextInputType.text,
-          obscureText: obscure,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            hintText: obscure ? '••••••' : 'Antre $label',
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) return 'Tanpri antre $label';
-            if (label == 'Email' && !value.contains('@')) return 'Imèl pa valid';
-            if (minLength != null && value.length < minLength) return 'Modpas la dwe gen omwen $minLength karaktè';
-            if (label == 'Confirm Password' && value != _passwordController.text) return 'Modpas yo pa menm bagay';
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
-  }
 }
-
 
 class HomePage extends StatelessWidget {
   final String email;
