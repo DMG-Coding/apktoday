@@ -61,7 +61,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-// Base class for Login and Signup pages to share common code
+
 abstract class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
 }
